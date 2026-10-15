@@ -3603,3 +3603,13 @@
 	Open a sequence to search its graphics	그래픽을 검색하려면 시퀀스를 여세요
 	No text graphics in this sequence. Add text with the Type tool.	이 시퀀스에는 텍스트 그래픽이 없습니다. 문자 도구로 텍스트를 추가하세요.
 	No matching text.	일치하는 텍스트가 없습니다.
+	Audio Peak Generation	오디오 피크 생성
+	Audio Peak Generation · {count} pending	오디오 피크 생성 · {count}개 대기 중
+	Estimated time remaining: {time}	예상 남은 시간: {time}
+	{count} audio streams pending	오디오 스트림 {count}개 대기 중
+	{count} audio streams complete	오디오 스트림 {count}개 완료
+	{count} audio peak jobs failed	오디오 피크 작업 {count}개 실패
+	No audio peak jobs.	오디오 피크 작업이 없습니다.
+	Queued	대기 중
+	Failed: {error}	실패: {error}
+	And {count} more	외 {count}개

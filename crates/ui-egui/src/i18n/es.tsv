@@ -3617,3 +3617,13 @@
 	Open a sequence to search its graphics	Abre una secuencia para buscar en sus gráficos
 	No text graphics in this sequence. Add text with the Type tool.	Esta secuencia no tiene gráficos con texto. Añade texto con la herramienta Texto.
 	No matching text.	Ningún texto coincide.
+	Audio Peak Generation	Generación de picos de audio
+	Audio Peak Generation · {count} pending	Generación de picos de audio · {count} pendientes
+	Estimated time remaining: {time}	Tiempo estimado restante: {time}
+	{count} audio streams pending	{count} flujos de audio pendientes
+	{count} audio streams complete	{count} flujos de audio completados
+	{count} audio peak jobs failed	Fallaron {count} tareas de picos de audio
+	No audio peak jobs.	No hay tareas de picos de audio.
+	Queued	En cola
+	Failed: {error}	Error: {error}
+	And {count} more	Y {count} más

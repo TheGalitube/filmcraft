@@ -624,7 +624,7 @@ pub fn waveform(
     let mid = area.center().y;
     p.line_segment([pos2(area.min.x, mid), pos2(area.max.x, mid)], Stroke::new(1.0, Color32::from_white_alpha(30)));
     match crate::panels::timeline::request_peaks(app, item, 0) {
-        Some(peaks) if !peaks.is_empty() => {
+        Some(peaks) if !peaks.values.is_empty() => {
             let half = area.height() * 0.45;
             let mut mesh = egui::Mesh::default();
             let col = Color32::from_rgb(0x4f, 0xc3, 0x7a);
@@ -669,16 +669,20 @@ pub fn waveform(
 
 /// The lowest and highest sample of `peaks` under the waveform column from `f0` to `f1` (fractions
 /// of the shown range `shown`): the narrower the range, the fewer peak buckets a column covers.
-fn column_peak(peaks: &[(f32, f32)], shown: (Tick, Tick), f0: f64, f1: f64) -> (f32, f32) {
-    let spp = 256.0 * TICKS_PER_SAMPLE_48K;
+fn column_peak(peaks: &crate::panels::timeline::WaveformPeaks, shown: (Tick, Tick), f0: f64, f1: f64) -> (f32, f32) {
     let (start, len) = (shown.0.0.max(0) as f64, (shown.1 - shown.0).0.max(1) as f64);
-    let s0 = ((start + len * f0) / spp) as usize;
-    let s1 = (((start + len * f1) / spp) as usize).max(s0 + 1);
-    peaks.iter().skip(s0).take(s1 - s0).fold((0f32, 0f32), |(l, h), (a, b)| (l.min(*a), h.max(*b)))
+    let s0 = peaks.peak_index_at(Tick((start + len * f0) as i64)).min(peaks.values.len());
+    let s1 = peaks
+        .peak_index_at(Tick((start + len * f1) as i64))
+        .max(s0.saturating_add(1))
+        .min(peaks.values.len());
+    peaks
+        .values
+        .iter()
+        .skip(s0)
+        .take(s1.saturating_sub(s0))
+        .fold((0f32, 0f32), |(l, h), (a, b)| (l.min(*a), h.max(*b)))
 }
-
-/// Ticks per 48 kHz sample (the waveform peaks are 256-sample min/max pairs at 48 kHz).
-const TICKS_PER_SAMPLE_48K: f64 = filmcraft_time::TICKS_PER_SECOND as f64 / 48_000.0;
 
 /// Comparison View: the reference side's label, timecode and step / set buttons.
 pub fn compare_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, rate: filmcraft_time::FrameRate, drop_frame: bool) {

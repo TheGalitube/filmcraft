@@ -3592,3 +3592,13 @@
 	Open a sequence to search its graphics	打开序列以搜索其中的图形
 	No text graphics in this sequence. Add text with the Type tool.	此序列中没有文本图形。请用文字工具添加文本。
 	No matching text.	没有匹配的文本。
+	Audio Peak Generation	音频峰值生成
+	Audio Peak Generation · {count} pending	音频峰值生成 · 还有 {count} 个
+	Estimated time remaining: {time}	预计剩余时间：{time}
+	{count} audio streams pending	还有 {count} 个音频流待处理
+	{count} audio streams complete	已完成 {count} 个音频流
+	{count} audio peak jobs failed	{count} 个音频峰值任务失败
+	No audio peak jobs.	没有音频峰值任务。
+	Queued	排队中
+	Failed: {error}	失败：{error}
+	And {count} more	还有 {count} 个

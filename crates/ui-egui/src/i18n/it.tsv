@@ -3608,3 +3608,13 @@
 	Open a sequence to search its graphics	Apri una sequenza per cercare nelle sue grafiche
 	No text graphics in this sequence. Add text with the Type tool.	Nessuna grafica con testo in questa sequenza. Aggiungi testo con lo strumento Testo.
 	No matching text.	Nessun testo corrispondente.
+	Audio Peak Generation	Generazione dei picchi audio
+	Audio Peak Generation · {count} pending	Generazione dei picchi audio · {count} in attesa
+	Estimated time remaining: {time}	Tempo rimanente stimato: {time}
+	{count} audio streams pending	{count} flussi audio in attesa
+	{count} audio streams complete	{count} flussi audio completati
+	{count} audio peak jobs failed	Operazioni di picco audio non riuscite: {count}
+	No audio peak jobs.	Nessuna operazione di picco audio.
+	Queued	In coda
+	Failed: {error}	Errore: {error}
+	And {count} more	E altri {count}

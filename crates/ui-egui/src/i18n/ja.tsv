@@ -3616,3 +3616,13 @@
 	Open a sequence to search its graphics	シーケンスを開くとグラフィックスを検索できます
 	No text graphics in this sequence. Add text with the Type tool.	このシーケンスにはテキストのグラフィックスがありません。文字ツールでテキストを追加してください。
 	No matching text.	一致するテキストはありません。
+	Audio Peak Generation	オーディオピークの生成
+	Audio Peak Generation · {count} pending	オーディオピークの生成 · 残り{count}
+	Estimated time remaining: {time}	推定残り時間: {time}
+	{count} audio streams pending	残り{count}個のオーディオストリーム
+	{count} audio streams complete	{count}個のオーディオストリームが完了
+	{count} audio peak jobs failed	オーディオピークの生成に{count}件失敗
+	No audio peak jobs.	オーディオピークの生成タスクはありません。
+	Queued	待機中
+	Failed: {error}	失敗: {error}
+	And {count} more	ほか{count}件

@@ -3613,3 +3613,13 @@
 	Shows the version, community links and credits in a FilmCraft window.	Zeigt Version, Community-Links und Credits in einem FilmCraft-Fenster.
 	Couldn't open your web browser	Dein Webbrowser konnte nicht geöffnet werden
 	Open this address in your browser yourself:	Öffne diese Adresse selbst in deinem Browser:
+	Audio Peak Generation	Generierung von Audio-Peaks
+	Audio Peak Generation · {count} pending	Generierung von Audio-Peaks · {count} ausstehend
+	Estimated time remaining: {time}	Geschätzte verbleibende Zeit: {time}
+	{count} audio streams pending	{count} Audiostreams ausstehend
+	{count} audio streams complete	{count} Audiostreams abgeschlossen
+	{count} audio peak jobs failed	{count} Audio-Peak-Aufgaben fehlgeschlagen
+	No audio peak jobs.	Keine Audio-Peak-Aufgaben.
+	Queued	In Warteschlange
+	Failed: {error}	Fehlgeschlagen: {error}
+	And {count} more	Und {count} weitere
