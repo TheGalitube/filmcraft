@@ -647,6 +647,26 @@ fn copy_paste_keeps_linked_audio_and_video_together_on_target_tracks() {
 }
 
 #[test]
+fn copy_paste_with_default_all_track_targeting_preserves_source_indexes() {
+    let (mut s, bars) = fresh();
+    s.execute("sequence.addTracks", json!({"video": 1, "audio": 1})).unwrap();
+    place(&mut s, bars, "V2", 0, 0, 24);
+    let source_video = s.active_sequence().unwrap().video_tracks[1].items[0].id.0;
+    s.execute("timeline.select", json!({"clips": [source_video]})).unwrap();
+    s.execute("edit.copy", json!({})).unwrap();
+    assert!(s.state.targeting.is_empty(), "the test uses the default all-track targeting");
+
+    s.execute("playhead.set", json!({"frame": 100})).unwrap();
+    s.execute("edit.paste", json!({})).unwrap();
+
+    let q = s.active_sequence().unwrap();
+    assert!(q.video_tracks[1].items.iter().any(|item| item.start == f(&s, 100)), "V2 remains the destination");
+    assert!(q.audio_tracks[1].items.iter().any(|item| item.start == f(&s, 100)), "A2 remains the destination");
+    assert!(q.video_tracks[0].items.is_empty(), "the paste does not shift the video clip to V1");
+    assert!(q.audio_tracks[0].items.is_empty(), "the paste does not shift the audio clip to A1");
+}
+
+#[test]
 fn copy_paste_preserves_track_offsets_and_adds_missing_destination_tracks() {
     let (mut s, bars) = fresh();
     s.execute("sequence.addTracks", json!({"video": 1, "audio": 0})).unwrap();

@@ -3649,7 +3649,10 @@ fn paste(s: &mut Session, insert: bool) -> Result<Value> {
     let mut paste_anchors = std::collections::HashMap::new();
     for kind in [TrackKind::Video, TrackKind::Audio] {
         let source_min = clip.iter().filter(|(k, _, _)| *k == kind).map(|(_, ti, _)| *ti).min();
-        let destination = seq.tracks(kind).iter().position(|t| targeting.targeted.contains(&t.id));
+        let tracks = seq.tracks(kind);
+        let all_targeted = !tracks.is_empty() && tracks.iter().all(|track| targeting.targeted.contains(&track.id));
+        // Default targeting selects every track, so preserve the copied source index in that case.
+        let destination = if all_targeted { source_min } else { tracks.iter().position(|track| targeting.targeted.contains(&track.id)) };
         if let (Some(source_min), Some(destination)) = (source_min, destination) {
             paste_anchors.insert(kind == TrackKind::Audio, (source_min, destination));
         }
