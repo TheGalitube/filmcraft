@@ -553,7 +553,14 @@ fn style_strip(app: &mut FilmcraftApp, ui: &mut egui::Ui, r: Rect, track_idx: us
 
 fn run(app: &mut FilmcraftApp, ui: &egui::Ui, actions: Vec<(String, Value)>) {
     let ctx = ui.ctx().clone();
-    for (cmd, p) in actions {
+    // Clicking the upgrade button can make a caption editor lose focus in the same frame. Commit
+    // its pending text before the upgrade deletes the caption and reads its current value.
+    let (text_edits, actions): (Vec<_>, Vec<_>) = if actions.iter().any(|(cmd, _)| cmd == "graphics.upgradeCaption") {
+        actions.into_iter().partition(|(cmd, _)| cmd == "captions.setText")
+    } else {
+        (Vec::new(), actions)
+    };
+    for (cmd, p) in text_edits.into_iter().chain(actions) {
         if let Err(e) = crate::menus::invoke(app, &ctx, &cmd, p) {
             app.ui.status = e;
         }

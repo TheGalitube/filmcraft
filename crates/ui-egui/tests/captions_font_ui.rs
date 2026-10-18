@@ -104,6 +104,24 @@ fn selected_captions_can_be_upgraded_to_graphics_together() {
     d.ok("engine.execute", json!({"command": "captions.select", "params": {"captions": [first, second]}}));
     d.frames(3);
 
+    let first_start = d
+        .harness
+        .state()
+        .session
+        .active_sequence()
+        .unwrap()
+        .caption_tracks
+        .iter()
+        .flat_map(|track| &track.captions)
+        .find(|caption| caption.id.0 == first)
+        .unwrap()
+        .start;
+    let text_field = d.ids(&format!("text.captions.{first}.text"));
+    assert_eq!(text_field.len(), 1, "the selected caption text editor is available");
+    d.ok("ui.click", json!({"id": text_field[0]}));
+    d.ok("ui.key", json!({"key": "Cmd+A"}));
+    d.ok("ui.type", json!({"text": "Edited first"}));
+
     let button = d.ids("text.captions.upgrade");
     assert_eq!(button.len(), 1, "the caption toolbar exposes the batch upgrade action");
     let undo_count = d.harness.state().session.history.undo.len();
@@ -112,10 +130,16 @@ fn selected_captions_can_be_upgraded_to_graphics_together() {
     let sequence = d.harness.state().session.active_sequence().unwrap();
     assert_eq!(sequence.caption_tracks.iter().map(|track| track.captions.len()).sum::<usize>(), 0);
     assert_eq!(sequence.video_tracks.iter().map(|track| track.items.len()).sum::<usize>(), initial_video_items + 2);
-    assert_eq!(d.harness.state().session.history.undo.len(), undo_count + 1, "the toolbar action is one undo step");
+    assert_eq!(d.harness.state().session.history.undo.len(), undo_count + 2, "the pending text edit and toolbar upgrade each have one undo step");
+    let graphic_clip =
+        sequence.video_tracks.iter().flat_map(|track| &track.items).find(|item| item.start == first_start).expect("the first caption became a graphic").id.0;
+    let graphic_layers = d.ok("engine.execute", json!({"command": "graphics.list", "params": {"clip": graphic_clip}}));
+    assert_eq!(graphic_layers["layers"][0]["text"], "Edited first", "the upgrade commits pending text before deleting the caption");
 
     d.ok("engine.execute", json!({"command": "edit.undo", "params": {}}));
     let sequence = d.harness.state().session.active_sequence().unwrap();
     assert_eq!(sequence.caption_tracks.iter().map(|track| track.captions.len()).sum::<usize>(), 2);
     assert_eq!(sequence.video_tracks.iter().map(|track| track.items.len()).sum::<usize>(), initial_video_items);
+    let restored = sequence.caption_tracks.iter().flat_map(|track| &track.captions).find(|caption| caption.id.0 == first).expect("undo restores the caption");
+    assert_eq!(restored.text, "Edited first", "undoing the upgrade preserves the committed caption edit");
 }
