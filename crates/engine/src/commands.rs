@@ -3642,12 +3642,39 @@ fn paste(s: &mut Session, insert: bool) -> Result<Value> {
     let at = s.playhead();
     let clip = s.state.clipboard.clone();
     let markers = if s.state.copy_paste_sequence_markers { s.state.clipboard_markers.clone() } else { Vec::new() };
+    // A single targeted track is the paste anchor for that kind. With the default all-targeted
+    // state, keep the clipboard's original track indexes so ordinary copy/paste stays in place.
+    let seq = s.active_sequence().ok_or(EngineError::NoSequence)?;
+    let targeting = s.targeting();
+    let mut paste_anchors = std::collections::HashMap::new();
+    for kind in [TrackKind::Video, TrackKind::Audio] {
+        let source_min = clip.iter().filter(|(k, _, _)| *k == kind).map(|(_, ti, _)| *ti).min();
+        let targets: Vec<usize> = seq.tracks(kind).iter().enumerate().filter_map(|(i, t)| targeting.targeted.contains(&t.id).then_some(i)).collect();
+        if let (Some(source_min), [destination]) = (source_min, targets.as_slice()) {
+            paste_anchors.insert(kind == TrackKind::Audio, (source_min, *destination));
+        }
+    }
     let end = s.edit_sequence(if insert { "Paste Insert" } else { "Paste" }, |q, ctx, st| {
         let mut placements = Vec::new();
         let mut links = std::collections::HashMap::new();
         for (kind, ti, item) in clip {
-            let tracks = q.tracks(kind);
-            let Some(t) = tracks.get(ti).or(tracks.last()) else { continue };
+            let destination_index = if let Some((source_min, destination)) = paste_anchors.get(&(kind == TrackKind::Audio)) {
+                let offset = ti.checked_sub(*source_min).ok_or_else(|| bad("edit.paste", "clipboard track offset is invalid"))?;
+                destination.checked_add(offset).ok_or_else(|| bad("edit.paste", "destination track index is too large"))?
+            } else {
+                ti
+            };
+            if destination_index >= crate::sequence_tools::MAX_TRACKS {
+                return Err(bad("edit.paste", format!("destination exceeds the {}-track limit", crate::sequence_tools::MAX_TRACKS)));
+            }
+            while q.tracks(kind).len() <= destination_index {
+                let tracks = q.tracks_mut(kind);
+                let number = tracks.len().checked_add(1).ok_or_else(|| bad("edit.paste", "track count is too large"))?;
+                let prefix = if kind == TrackKind::Video { "Video" } else { "Audio" };
+                let name = format!("{prefix} {number}");
+                tracks.push(filmcraft_project::Track::new(TrackId(ctx.alloc()), kind, name));
+            }
+            let t = q.tracks(kind).get(destination_index).ok_or_else(|| bad("edit.paste", "destination track is unavailable"))?;
             let mut it = item.clone();
             it.id = ClipId(ctx.alloc());
             it.start += at;
