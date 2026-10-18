@@ -599,7 +599,8 @@ pub fn guides(app: &mut FilmcraftApp, ui: &mut egui::Ui, w: Which, area: Rect, p
 }
 
 /// The Source Monitor's audio waveform (Audio Waveform display mode, audio-only clips and the
-/// split view): click to move the source playhead.
+/// split view) over `shown`, the part of the clip the time ruler shows: click to move the source
+/// playhead.
 #[allow(clippy::too_many_arguments)]
 pub fn waveform(
     app: &mut FilmcraftApp,
@@ -607,17 +608,17 @@ pub fn waveform(
     area: Rect,
     item: ItemId,
     time: Tick,
-    duration: Tick,
+    shown: (Tick, Tick),
     mark_in: Option<Tick>,
     mark_out: Option<Tick>,
 ) {
     let t = app.tokens;
     let p = ui.painter().with_clip_rect(area);
     p.rect_filled(area, 0.0, t.monitor_bg);
-    let dur = duration.0.max(1) as f64;
-    let xof = |tk: Tick| area.min.x + ((tk.0 as f64 / dur) as f32).clamp(0.0, 1.0) * area.width();
+    let dur = (shown.1 - shown.0).0.max(1) as f64;
+    let xof = |tk: Tick| area.min.x + (((tk - shown.0).0 as f64 / dur) as f32).clamp(0.0, 1.0) * area.width();
     if mark_in.is_some() || mark_out.is_some() {
-        let (a, b) = (xof(mark_in.unwrap_or(Tick::ZERO)), xof(mark_out.unwrap_or(duration)));
+        let (a, b) = (xof(mark_in.unwrap_or(shown.0)), xof(mark_out.unwrap_or(shown.1)));
         p.rect_filled(Rect::from_min_max(pos2(a, area.min.y), pos2(b, area.max.y)), 0.0, Color32::from_white_alpha(14));
     }
     let mid = area.center().y;
@@ -630,9 +631,7 @@ pub fn waveform(
             for x in (area.min.x.floor() as i32)..(area.max.x.ceil() as i32) {
                 let f0 = (x as f32 - area.min.x) / area.width();
                 let f1 = (x as f32 + 1.0 - area.min.x) / area.width();
-                let s0 = peaks.peak_index_at(Tick((dur * f0 as f64) as i64)).min(peaks.values.len());
-                let s1 = peaks.peak_index_at(Tick((dur * f1 as f64) as i64)).max(s0.saturating_add(1)).min(peaks.values.len());
-                let (lo, hi) = peaks.values.iter().skip(s0).take(s1.saturating_sub(s0)).fold((0f32, 0f32), |(l, h), (a, b)| (l.min(*a), h.max(*b)));
+                let (lo, hi) = column_peak(&peaks, shown, f0 as f64, f1 as f64);
                 if hi - lo > 0.002 {
                     mesh.add_colored_rect(
                         Rect::from_min_max(pos2(x as f32, mid - hi.min(1.0) * half), pos2(x as f32 + 1.0, mid - lo.max(-1.0) * half + 1.0)),
@@ -664,10 +663,24 @@ pub fn waveform(
         && let Some(pos) = resp.interact_pointer_pos()
     {
         let f = ((pos.x - area.min.x) / area.width()).clamp(0.0, 1.0) as f64;
-        let _ = app.session.execute("source.setPlayhead", json!({"time": (f * dur) as i64}));
+        let _ = app.session.execute("source.setPlayhead", json!({"time": shown.0.0.saturating_add((f * dur) as i64)}));
     }
 }
 
+/// The lowest and highest sample of `peaks` under the waveform column from `f0` to `f1` (fractions
+/// of the shown range `shown`): the narrower the range, the fewer peak buckets a column covers.
+fn column_peak(peaks: &crate::panels::timeline::WaveformPeaks, shown: (Tick, Tick), f0: f64, f1: f64) -> (f32, f32) {
+    if !f0.is_finite() || !f1.is_finite() {
+        return (0.0, 0.0);
+    }
+    let f0 = f0.clamp(0.0, 1.0);
+    let f1 = f1.clamp(f0, 1.0);
+    let duration = (shown.1 - shown.0).0.max(1);
+    let time_at = |fraction: f64| Tick(shown.0.0.saturating_add((duration as f64 * fraction) as i64));
+    let s0 = peaks.peak_index_at(time_at(f0)).min(peaks.values.len());
+    let s1 = peaks.peak_index_at(time_at(f1)).max(s0.saturating_add(1)).min(peaks.values.len());
+    peaks.values.iter().skip(s0).take(s1.saturating_sub(s0)).fold((0.0f32, 0.0f32), |(l, h), (a, b)| (l.min(*a), h.max(*b)))
+}
 /// Comparison View: the reference side's label, timecode and step / set buttons.
 pub fn compare_bar(app: &mut FilmcraftApp, ui: &mut egui::Ui, bar: Rect, rate: filmcraft_time::FrameRate, drop_frame: bool) {
     let t = app.tokens;
@@ -955,5 +968,26 @@ mod tests {
         v.paused_res = PlaybackRes::Quarter;
         assert_eq!(v.effective_res(true), PlaybackRes::Half);
         assert_eq!(v.effective_res(false), PlaybackRes::Quarter);
+    }
+
+    #[test]
+    fn zooming_in_resolves_the_waveform_in_finer_columns() {
+        // a square wave: four loud peak buckets, then four silent ones, 800 buckets in all
+        let peaks = crate::panels::timeline::WaveformPeaks {
+            sample_rate: 48_000,
+            samples_per_peak: 256,
+            values: (0..800).map(|i| if (i / 4) % 2 == 0 { (-1.0, 1.0) } else { (0.0, 0.0) }).collect(),
+        };
+        let bucket = 256.0 * filmcraft_time::TICKS_PER_SECOND as f64 / 48_000.0;
+        let at = |b: f64| Tick((b * bucket) as i64);
+        let silent = |shown: (Tick, Tick)| (0..100).filter(|x| column_peak(&peaks, shown, *x as f64 / 100.0, (*x + 1) as f64 / 100.0).1 == 0.0).count();
+        // the whole clip in 100 columns: 8 buckets each, every one with a loud part
+        assert_eq!(silent((at(0.0), at(800.0))), 0);
+        // an eighth of it: about one bucket a column (a column edge rounding down takes in its
+        // neighbour), and the silent half shows
+        let zoomed = silent((at(0.0), at(100.0)));
+        assert!((45..=50).contains(&zoomed), "{zoomed} silent columns");
+        // the zoomed part starts where the ruler does: a silent stretch is silent throughout
+        assert_eq!(silent((at(4.0), at(8.0))), 100);
     }
 }
