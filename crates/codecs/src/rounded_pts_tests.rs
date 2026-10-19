@@ -217,6 +217,29 @@ fn phone_mp4_with_one_dropped_frame_in_120_keeps_30_fps_rate() {
 }
 
 #[test]
+fn mp4_with_jittered_90k_durations_and_minority_mode_keeps_30_fps_rate() {
+    let mut durations = Vec::with_capacity(240);
+    for duration in 2985..=3015 {
+        let count = if duration == 3003 {
+            9
+        } else if duration <= 3006 {
+            8
+        } else {
+            7
+        };
+        durations.extend(std::iter::repeat_n(duration, count));
+    }
+    let mut shuffled: Vec<(usize, u32)> = durations.into_iter().enumerate().map(|(index, duration)| (index * 97 % 240, duration)).collect();
+    shuffled.sort_unstable_by_key(|(order, _)| *order);
+    let durations: Vec<u32> = shuffled.into_iter().map(|(_, duration)| duration).collect();
+
+    assert_eq!(durations.len(), 240);
+    assert_eq!(durations.iter().filter(|&&duration| duration == 3003).count(), 9);
+    let src = crate::open_bytes("phone-jittered.mov", mp4_90k(&durations)).unwrap();
+    assert_eq!(src.info().video.as_ref().map(|v| v.frame_rate), Some(FrameRate::FPS_30));
+}
+
+#[test]
 fn mp4_with_1501_and_1502_tick_durations_keeps_59_94_fps_rate() {
     let durations: Vec<u32> = (0..120).map(|k: u64| (((k + 1) * 1_501_500 / 1000) - (k * 1_501_500 / 1000)) as u32).collect();
     let src = crate::open_bytes("59.94.mov", mp4_90k(&durations)).unwrap();

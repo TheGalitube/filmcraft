@@ -699,14 +699,15 @@ fn frame_rate_from_durations(timescale: u32, durations: impl Iterator<Item = u32
         })
         .collect();
 
-    // Coarse timescales can round neighboring common rates to the same duration. Use only samples
-    // within one tick of the mode to distinguish them; this keeps dropped-frame gaps out of the
-    // estimate while retaining the fractional-tick cadence (for example 16/17 ms at 60 fps).
+    // Coarse timescales can round neighboring common rates to the same duration. Use samples
+    // within one tick of the mode to distinguish them only when they are a majority; otherwise a
+    // fine-timescale jitter spike could masquerade as the cadence. This keeps dropped-frame gaps out
+    // while retaining the fractional-tick cadence (for example 16/17 ms at 60 fps).
     let (near_count, near_total) = durations
         .iter()
         .filter(|&&duration| duration.abs_diff(mode) <= 1)
         .fold((0usize, 0u64), |(count, total), &duration| (count + 1, total + u64::from(duration)));
-    if near_count > 0 && near_total > 0 {
+    if near_count > durations.len() / 2 && near_total > 0 {
         let near_fps = f64::from(timescale) * near_count as f64 / near_total as f64;
         let closest_modal_rate = modal_rates.into_iter().min_by(|a, b| {
             (a.as_f64() - near_fps)
@@ -758,6 +759,25 @@ fn snap_to_frame_grid(file: &mut Mp4File, vtrack: Option<usize>) {
     // one frame lasts `step_num / step_den` track units
     let (step_num, step_den) = (i128::from(t.timescale) * i128::from(rate.den), i128::from(rate.num));
     if step_num <= 0 || step_den <= 0 {
+        return;
+    }
+    // The bounded mean fallback can describe a VFR average rather than a frame cadence. Require
+    // each sample duration to be close to a whole number of frames before snapping timestamps;
+    // this still permits dropped-frame gaps and timescale rounding, but rejects e.g. alternating
+    // 30/20 fps durations that happen to average to a clean 24 fps grid.
+    let durations_fit_grid = t.samples.iter().all(|sample| {
+        let Some(scaled_duration) = i128::from(sample.duration).checked_mul(step_den) else { return false };
+        let Some(rounded_duration) = scaled_duration.checked_add(step_num / 2) else { return false };
+        let frame_count = rounded_duration.div_euclid(step_num);
+        if frame_count <= 0 {
+            return false;
+        }
+        let Some(expected_duration) = frame_count.checked_mul(step_num) else { return false };
+        let Some(error) = scaled_duration.checked_sub(expected_duration).and_then(i128::checked_abs) else { return false };
+        let Some(scaled_error) = error.checked_mul(8) else { return false };
+        scaled_error < step_num
+    });
+    if !durations_fit_grid {
         return;
     }
     // a sample's grid index and its new time
