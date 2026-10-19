@@ -132,8 +132,8 @@ mod tests {
         crate::theme::install(&ctx, &app.tokens);
 
         frame_at_height(&mut app, &ctx, 0.0, vec![], 160.0);
-        let before = center_of(&app, "tools.Type");
-        assert!(before.is_none_or(|p| p.y > 160.0), "the last tool starts below a short panel: {before:?}");
+        let before = center_of(&app, "tools.Type").expect("the Type tool is registered before scrolling");
+        assert!(before.y > 160.0, "the last tool starts below a short panel: {before:?}");
 
         frame_at_height(
             &mut app,
