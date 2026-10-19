@@ -209,6 +209,22 @@ fn phone_vfr_with_dropped_frames_keeps_its_base_rate() {
     assert_eq!(src.info().video.as_ref().map(|v| v.frame_rate), Some(FrameRate::FPS_30));
 }
 
+#[test]
+fn phone_mp4_with_one_dropped_frame_in_120_keeps_30_fps_rate() {
+    let durations: Vec<u32> = (0..120).map(|k| if k == 119 { 6000 } else { 3000 }).collect();
+    let src = crate::open_bytes("phone-one-drop.mov", mp4_90k(&durations)).unwrap();
+    assert_eq!(src.info().video.as_ref().map(|v| v.frame_rate), Some(FrameRate::FPS_30));
+}
+
+#[test]
+fn mp4_with_1501_and_1502_tick_durations_keeps_59_94_fps_rate() {
+    let durations: Vec<u32> = (0..120).map(|k: u64| (((k + 1) * 1_501_500 / 1000) - (k * 1_501_500 / 1000)) as u32).collect();
+    let src = crate::open_bytes("59.94.mov", mp4_90k(&durations)).unwrap();
+    assert_eq!(src.info().video.as_ref().map(|v| v.frame_rate), Some(FrameRate::FPS_59_94));
+    let failures = problems_for_count(src.as_ref(), FrameRate::FPS_59_94, durations.len());
+    assert!(failures.is_empty(), "59.94 fps: {}", failures.join("\n"));
+}
+
 /// Files that are not a constant rate gone slightly off its grid keep their own times: whatever is
 /// asked (each frame's start, the unit before it, every 30 fps grid point), the frame shown is the
 /// last one starting at or before it.
