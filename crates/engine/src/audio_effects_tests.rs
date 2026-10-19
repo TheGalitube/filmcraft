@@ -104,9 +104,24 @@ fn studio_reverb_track_insert_changes_the_rendered_audio() {
     s.execute("mixer.setInsert", json!({"strip": "A1", "slot": 0, "params": {"dry": 0.0, "wet": 100.0}})).unwrap();
     let after = render(&s, 4800);
 
-    let difference =
-        before.channels.iter().flatten().zip(after.channels.iter().flatten()).map(|(before, after)| f64::from((*before - *after).abs())).sum::<f64>();
-    assert!(difference > 1.0, "the track reverb should change the audible mix, difference={difference}");
+    let mut compared_samples = 0usize;
+    let absolute_difference = before
+        .channels
+        .iter()
+        .zip(after.channels.iter())
+        .flat_map(|(before, after)| before.iter().zip(after))
+        .map(|(before, after)| {
+            compared_samples = compared_samples.saturating_add(1);
+            f64::from((*before - *after).abs())
+        })
+        .sum::<f64>();
+    assert!(compared_samples > 0, "the demo render should contain samples to compare");
+    let mean_absolute_difference = absolute_difference / compared_samples as f64;
+    println!("track reverb mean absolute sample delta = {mean_absolute_difference:.6}");
+    assert!(
+        mean_absolute_difference > 1e-4,
+        "track reverb mean absolute sample delta should exceed 1e-4 normalized amplitude, got {mean_absolute_difference:.6}"
+    );
 }
 
 #[test]
