@@ -1903,7 +1903,9 @@ mod color_tests {
             ..Default::default()
         }));
 
+        let inherited = pv(&e, "fill_color", Tick::ZERO).as_color().unwrap_or([1.0; 4]);
         assert_eq!(displayed_color(&e, "fill_color", Tick::ZERO, Some((2, 6))), selected);
-        assert_eq!(displayed_color(&e, "fill_color", Tick::ZERO, None), pv(&e, "fill_color", Tick::ZERO).as_color().unwrap_or([1.0; 4]));
+        assert_eq!(displayed_color(&e, "fill_color", Tick::ZERO, Some((0, 6))), inherited);
+        assert_eq!(displayed_color(&e, "fill_color", Tick::ZERO, None), inherited);
     }
 }
