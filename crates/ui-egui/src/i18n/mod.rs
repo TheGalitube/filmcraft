@@ -346,10 +346,7 @@ mod tests {
             ("es", include_str!("es.tsv")),
             ("ja", include_str!("ja.tsv")),
             ("pt-br", include_str!("pt-br.tsv")),
-            ("uk", include_str!("uk.tsv")),
             ("zh-cn", include_str!("zh-cn.tsv")),
-            ("de", include_str!("de.tsv")),
-            ("ru", include_str!("ru.tsv")),
             ("fr", include_str!("fr.tsv")),
             ("id", include_str!("id.tsv")),
             ("it", include_str!("it.tsv")),
@@ -480,10 +477,7 @@ mod tests {
             ("es", include_str!("es.tsv")),
             ("ja", include_str!("ja.tsv")),
             ("pt-br", include_str!("pt-br.tsv")),
-            ("uk", include_str!("uk.tsv")),
             ("zh-cn", include_str!("zh-cn.tsv")),
-            ("de", include_str!("de.tsv")),
-            ("ru", include_str!("ru.tsv")),
             ("fr", include_str!("fr.tsv")),
             ("id", include_str!("id.tsv")),
             ("it", include_str!("it.tsv")),
@@ -1119,7 +1113,7 @@ mod tests {
         let known = |text: &str| crate::menus::MENUS.contains(&text) || items.iter().any(|it| it.label == text || it.path.iter().any(|p| p == text));
         let (entries, _) = catalog::parse_entries(include_str!("uk.tsv"));
         for (_, en, _) in entries {
-            assert!(known(&en) || en == "Settings" || en == "Move Playhead to Cursor", "unexpected catalog entry: {en}");
+            assert!(known(&en) || en == "Settings", "not a menu label: {en}");
         }
         for en in crate::menus::MENUS.into_iter().chain(["Audio", "Settings"]) {
             assert_ne!(Language::Uk.tr(en), en, "untranslated Ukrainian menu: {en}");
@@ -1135,7 +1129,7 @@ mod tests {
         let known = |text: &str| crate::menus::MENUS.contains(&text) || items.iter().any(|it| it.label == text || it.path.iter().any(|p| p == text));
         let (entries, _) = catalog::parse_entries(include_str!("de.tsv"));
         for (_, en, _) in entries {
-            assert!(known(&en) || crate::menus::NATIVE_APP_MENU.contains(&en.as_str()) || en == "Move Playhead to Cursor", "unexpected catalog entry: {en}");
+            assert!(known(&en) || crate::menus::NATIVE_APP_MENU.contains(&en.as_str()), "not a menu label: {en}");
         }
         for en in core_menu_labels() {
             assert!(Language::De.has(&en), "missing German menu label: {en}");
@@ -1210,7 +1204,7 @@ mod tests {
         let known = |text: &str| crate::menus::MENUS.contains(&text) || items.iter().any(|it| it.label == text || it.path.iter().any(|p| p == text));
         let (entries, _) = catalog::parse_entries(include_str!("ru.tsv"));
         for (_, en, _) in entries {
-            assert!(known(&en) || en == "Settings" || en == "Move Playhead to Cursor", "unexpected catalog entry: {en}");
+            assert!(known(&en) || en == "Settings", "not a menu label: {en}");
         }
         for en in core_menu_labels() {
             assert!(Language::Ru.has(&en), "missing Russian menu label: {en}");
