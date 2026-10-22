@@ -1743,7 +1743,8 @@ fn snap(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick, exclud
 /// Where a dragged playhead lands: [`snap`], but not onto itself, or it would stick where it is
 /// and only move in jumps of `SNAP_PX` (#164).
 fn snap_playhead(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick) -> Tick {
-    snap_to(app, seq, layout, t, &[], false)
+    let target = snap_to(app, seq, layout, t, &[], false);
+    seq.settings.frame_rate.snap_nearest(target.max(Tick::ZERO))
 }
 
 fn snap_to(app: &mut FilmcraftApp, seq: &Sequence, layout: &Layout, t: Tick, exclude: &[ClipId], to_playhead: bool) -> Tick {
@@ -3256,6 +3257,37 @@ mod reveal_tests {
         assert_eq!(scroll_to_reveal(5.0, 0.0, 40.0, 800.0), None);
         assert_eq!(scroll_to_reveal(f64::NAN, 0.0, 40.0, 800.0), None);
         assert_eq!(scroll_to_reveal(5.0, 0.0, 0.0, 800.0), None);
+    }
+}
+
+#[cfg(test)]
+mod snap_playhead_tests {
+    use super::*;
+
+    #[test]
+    fn off_frame_marker_snaps_to_the_nearest_frame() {
+        let mut session = filmcraft_engine::Session::default();
+        session.execute("file.openDemoProject", serde_json::json!({})).unwrap();
+        session.execute("sequence.snap", serde_json::json!({"on": true})).unwrap();
+
+        let rate = session.sequence_rate();
+        let frame_ticks = rate.frame_duration().0;
+        let marker = Tick(frame_ticks.saturating_mul(6).saturating_add(frame_ticks.saturating_mul(3) / 5));
+        session.execute("markers.add", serde_json::json!({"time": marker.0, "name": "Off-frame marker"})).unwrap();
+        let sequence = session.active_sequence().unwrap().clone();
+        let mut app = FilmcraftApp::new(session);
+        let layout = Layout {
+            content: Rect::from_min_size(pos2(0.0, 0.0), vec2(1_000.0, 100.0)),
+            ruler: Rect::from_min_size(pos2(0.0, 0.0), vec2(1_000.0, 20.0)),
+            rows: Vec::new(),
+            pps: 100.0,
+            scroll: 0.0,
+            split_y: 50.0,
+        };
+
+        let expected = rate.snap_nearest(marker);
+        assert_ne!(expected, marker, "the marker deliberately falls between frame boundaries");
+        assert_eq!(snap_playhead(&mut app, &sequence, &layout, expected), expected);
     }
 }
 
