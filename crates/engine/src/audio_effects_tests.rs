@@ -99,10 +99,13 @@ fn parameters_are_set_by_id_and_change_the_sound() {
 #[test]
 fn studio_reverb_track_insert_changes_the_rendered_audio() {
     let mut s = demo();
-    let before = render(&s, 4800);
     s.execute("mixer.addInsert", json!({"strip": "A1", "effect": "studio_reverb"})).unwrap();
+    let before = render(&s, 4800);
     s.execute("mixer.setInsert", json!({"strip": "A1", "slot": 0, "params": {"dry": 0.0, "wet": 100.0}})).unwrap();
     let after = render(&s, 4800);
+
+    let peak = |b: &filmcraft_frame::AudioBuffer| b.channels.iter().flatten().fold(0.0f32, |peak, sample| peak.max(sample.abs()));
+    assert!(peak(&after) > 1e-3, "the fully wet track insert should still produce an audible signal");
 
     let mut compared_samples = 0usize;
     let absolute_difference = before
