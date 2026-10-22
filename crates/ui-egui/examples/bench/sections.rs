@@ -516,9 +516,13 @@ pub fn export(o: &Opts) -> Vec<Value> {
             filmcraft_export::reset_export_lock_wait();
             filmcraft_gpu::export_renderer::timing::reset();
             let (t0, c0) = (Instant::now(), cpu_now());
-            // `--hw auto`: the hardware encoder too (NVENC H.264 on Windows); `--hw off`: ours
+            // Keep encoder choice (`--hw`) separate from compositor choice (`--gpu-rendering`) so
+            // CPU/GPU export measurements can use the same encoder on both paths.
             let hardware = if o.hw == "off" { "off" } else { "auto" };
-            let r = s.execute("file.exportMedia", json!({"path": out.to_string_lossy(), "format": format, "hardwareEncoding": hardware, "gpuRendering": if o.hw == "off" { "off" } else { "auto" }, "wait": true}));
+            let r = s.execute(
+                "file.exportMedia",
+                json!({"path": out.to_string_lossy(), "format": format, "hardwareEncoding": hardware, "gpuRendering": o.gpu_rendering, "wait": true}),
+            );
             let dt = t0.elapsed().as_secs_f64();
             if let Err(e) = r {
                 eprintln!("export {format}: {e}");

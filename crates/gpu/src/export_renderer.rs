@@ -185,9 +185,11 @@ impl ExportRenderer {
             return self.render(project, seq, t, opts, sources).map(ExportRender::Linear);
         }
         let plan = plan_frame(project, seq, t, opts, sources);
-        let FramePlan::Layers { .. } = &plan else {
-            return self.render(project, seq, t, opts, sources).map(ExportRender::Linear);
-        };
+        match &plan {
+            FramePlan::Image(img) => return Some(ExportRender::Linear(img.clone())),
+            FramePlan::Composite { .. } => return None,
+            FramePlan::Layers { .. } => {}
+        }
         if device_failed() {
             return None;
         }
@@ -358,10 +360,13 @@ mod tests {
         let cpu = filmcraft_render::render_sequence(&project, seq, Tick::ZERO, RenderOptions::default(), &sources);
         let gpu = renderer.render(&project, seq, Tick::ZERO, RenderOptions::default(), &sources).expect("GPU rendered the masked clip");
         assert_parity(&cpu, &gpu, "opacity mask");
-        let Some(ExportRender::Rgba8 { pixels, .. }) = renderer.render_for_export(&project, seq, Tick::ZERO, RenderOptions::default(), &sources, true) else {
+        let Some(ExportRender::Rgba8 { width, height, pixels }) =
+            renderer.render_for_export(&project, seq, Tick::ZERO, RenderOptions::default(), &sources, true)
+        else {
             panic!("opaque SDR mask should use the direct RGBA8 GPU export path");
         };
         let cpu_rgba8 = cpu.over_black_rgba8();
+        assert_eq!(pixels.len(), cpu_rgba8.len(), "GPU and CPU comparison frames must have matching dimensions");
         let mut differences = cpu_rgba8
             .as_chunks::<4>()
             .0
@@ -372,7 +377,29 @@ mod tests {
         differences.sort_unstable();
         let p99 = differences[differences.len() * 99 / 100];
         let mean = differences.iter().sum::<u32>() as f64 / differences.len() as f64;
+        eprintln!("direct RGBA8 opacity mask parity p99 {p99}, mean {mean:.3}");
         assert!(p99 <= 6 && mean < 1.5, "direct RGBA8 opacity mask parity p99 {p99}, mean {mean:.3}");
+
+        // Optional real-hardware evidence capture for the export report. The frame is generated
+        // from this synthetic project, so the left half is the CPU reference and the right half
+        // is the direct GPU RGBA8 export result.
+        if let Ok(path) = std::env::var("FILMCRAFT_MASK_COMPARISON_PNG") {
+            let row_bytes = (width as usize).checked_mul(4).expect("test image row size");
+            let half_bytes = row_bytes.checked_mul(height as usize).expect("test image size");
+            assert_eq!(cpu_rgba8.len(), half_bytes, "comparison image byte count");
+            let canvas_width = width.checked_mul(2).expect("test comparison width");
+            let mut comparison = vec![0; half_bytes.checked_mul(2).expect("test comparison image size")];
+            for y in 0..height as usize {
+                let source_start = y * row_bytes;
+                let source_end = source_start + row_bytes;
+                let left_start = y * row_bytes * 2;
+                let right_start = left_start + row_bytes;
+                comparison[left_start..left_start + row_bytes].copy_from_slice(&cpu_rgba8[source_start..source_end]);
+                comparison[right_start..right_start + row_bytes].copy_from_slice(&pixels[source_start..source_end]);
+            }
+            let image = image::RgbaImage::from_raw(canvas_width, height, comparison).expect("test comparison image shape");
+            image.save(path).expect("save test comparison image");
+        }
     }
 
     #[test]
