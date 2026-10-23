@@ -247,11 +247,12 @@ impl Pipeline {
             None => None,
         };
         let img = match gpu {
-            Some(ExportFrame::Rgba8 { width, height, pixels }) if can_use_rgba8 && (width, height) == (self.w, self.h) => {
-                note_gpu_frame();
-                return (pixels, Vec::new());
-            }
-            Some(ExportFrame::Rgba8 { .. }) => {
+            Some(ExportFrame::Rgba8 { width, height, pixels }) => {
+                let expected_len = (width as usize).checked_mul(height as usize).and_then(|count| count.checked_mul(4));
+                if can_use_rgba8 && (width, height) == (self.w, self.h) && expected_len == Some(pixels.len()) {
+                    note_gpu_frame();
+                    return (pixels, Vec::new());
+                }
                 note_gpu_fallback();
                 filmcraft_render::render_sequence(&self.project, self.seq, t, self.opts, sources)
             }

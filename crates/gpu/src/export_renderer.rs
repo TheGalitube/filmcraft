@@ -359,6 +359,7 @@ mod tests {
         assert!(layers.first().is_some_and(|layer| layer.opacity_masks.is_some()), "planned layer carries the active mask");
         let cpu = filmcraft_render::render_sequence(&project, seq, Tick::ZERO, RenderOptions::default(), &sources);
         let gpu = renderer.render(&project, seq, Tick::ZERO, RenderOptions::default(), &sources).expect("GPU rendered the masked clip");
+        assert_eq!(renderer.compositor.opacity_mask_cache_entries(), 1, "masked export must populate the GPU mask cache");
         assert_parity(&cpu, &gpu, "opacity mask");
         let Some(ExportRender::Rgba8 { width, height, pixels }) =
             renderer.render_for_export(&project, seq, Tick::ZERO, RenderOptions::default(), &sources, true)

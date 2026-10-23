@@ -459,6 +459,7 @@ fn gpu_compositor_applies_opacity_masks_before_motion() {
     let cpu = execute_cpu(&plan).over_black_rgba8();
     let mut compositor = GpuCompositor::new(&dev, &q);
     compositor.composite(&plan);
+    assert_eq!(compositor.opacity_mask_cache.len(), 1, "opacity mask should use the GPU texture path");
     let (_, _, gpu) = compositor.read_output().expect("readback");
     let mut differences: Vec<u32> = cpu
         .as_chunks::<4>()

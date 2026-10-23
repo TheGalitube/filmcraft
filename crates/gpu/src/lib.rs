@@ -826,6 +826,11 @@ impl GpuCompositor {
         self.render_plan(plan, prep, true, true)
     }
 
+    #[cfg(test)]
+    pub(crate) fn opacity_mask_cache_entries(&self) -> usize {
+        self.opacity_mask_cache.len()
+    }
+
     fn render_plan(&mut self, plan: &FramePlan, prep: Option<&PreparedPlan>, clear: bool, resolve: bool) -> (wgpu::TextureView, (u32, u32)) {
         let owned;
         let (w, h, layers): (u32, u32, &[PlanLayer]) = match plan {

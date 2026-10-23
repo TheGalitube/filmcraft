@@ -145,7 +145,7 @@ fn orchestrate(args: &[String], o: &Opts) {
         println!("{}", section_markdown(&v));
         results.push(v);
     }
-    let doc = json!({"label": label, "machine": machine, "repeat": o.repeat, "quick": o.quick, "gpu": o.gpu, "hw": o.hw, "sections": results});
+    let doc = json!({"label": label, "machine": machine, "repeat": o.repeat, "quick": o.quick, "gpu": o.gpu, "gpu_rendering": o.gpu_rendering, "hw": o.hw, "sections": results});
     let jp = out.join(format!("bench-{label}.json"));
     let mp = out.join(format!("bench-{label}.md"));
     std::fs::write(&jp, serde_json::to_string_pretty(&doc).unwrap_or_default()).expect("write json");
