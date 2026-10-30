@@ -270,8 +270,7 @@ fn media_cache_retention_cleans_old_saved_project_previews() {
     // same age policy to its project-side preview folder before the folder is indexed.
     std::fs::write(&old, b"old render preview").unwrap();
     std::fs::File::options().write(true).open(&old).unwrap().set_modified(two_days_ago).unwrap();
-    let mut reopened = Session::default();
-    reopened.prefs_path = Some(folder.join("preferences.json"));
+    let mut reopened = Session { prefs_path: Some(folder.join("preferences.json")), ..Session::default() };
     reopened.prefs.media_cache.management = "olderThan".into();
     reopened.prefs.media_cache.older_than_days = 1;
     reopened.apply_media_cache();

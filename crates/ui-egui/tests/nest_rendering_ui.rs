@@ -72,8 +72,8 @@ impl Driver {
         for _ in 0..400 {
             self.frames(1);
             let got = self.app().tl.peaks.lock().unwrap().get(&(ItemId(item), 0)).cloned();
-            if let Some(p) = got.filter(|p| ready(p)) {
-                return p.to_vec();
+            if let Some(p) = got.filter(|p| ready(&p.values)) {
+                return p.values.to_vec();
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }

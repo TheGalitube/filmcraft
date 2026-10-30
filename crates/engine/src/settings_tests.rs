@@ -493,8 +493,7 @@ fn startup_applies_retention_to_saved_generated_cache_files() {
     std::fs::File::options().write(true).open(&old_waveform).unwrap().set_modified(two_days_ago).unwrap();
     std::fs::File::options().write(true).open(&old_preview).unwrap().set_modified(two_days_ago).unwrap();
 
-    let mut s = Session::default();
-    s.prefs_path = Some(dir.join("preferences.json"));
+    let mut s = Session { prefs_path: Some(dir.join("preferences.json")), ..Session::default() };
     s.prefs.media_cache.management = "olderThan".into();
     s.prefs.media_cache.older_than_days = 1;
     s.apply_media_cache();
