@@ -4,6 +4,12 @@ use super::*;
 fn stream_number_supports_decimal_and_hex_ids() {
     assert_eq!(Stream::number(b"10dc"), Some(10));
     assert_eq!(Stream::number(b"0adc"), Some(10));
+    assert_eq!(Stream::number(b"00dc"), Some(0));
+    assert_eq!(Stream::number(b"09wb"), Some(9));
+    assert_eq!(Stream::number(b"0Fdc"), Some(15));
+    // `from_str_radix` would take a sign; a chunk id never has one
+    assert_eq!(Stream::number(b"+1dc"), None);
+    assert_eq!(Stream::number(b"ixdc"), None);
 }
 
 fn chunk(id: &[u8; 4], data: &[u8]) -> Vec<u8> {

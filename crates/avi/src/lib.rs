@@ -156,10 +156,12 @@ pub struct Stream {
 impl Stream {
     /// Stream index of a `movi` chunk id (`00dc`, `01wb`…): its first two characters.
     fn number(id: &[u8; 4]) -> Option<usize> {
-        let has_hex_digit = id[..2].iter().any(|b| matches!(b, b'a'..=b'f' | b'A'..=b'F'));
-        let radix = if has_hex_digit { 16 } else { 10 };
-        let digits = std::str::from_utf8(&id[..2]).ok()?;
-        usize::from_str_radix(digits, radix).ok()
+        // ffmpeg-style writers number streams in decimal ("10dc" = 10), Video for Windows in hex
+        // ("0adc" = 10): a hex letter means hex, two decimal digits mean decimal
+        let [a, b, ..] = *id;
+        let radix = if [a, b].iter().any(|c| matches!(c, b'a'..=b'f' | b'A'..=b'F')) { 16 } else { 10 };
+        let d = |c: u8| (c as char).to_digit(radix).map(|v| v as usize);
+        Some(d(a)? * radix as usize + d(b)?)
     }
 }
 
