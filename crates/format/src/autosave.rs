@@ -2,9 +2,11 @@
 //!
 //! Auto-saves go to an `Auto-Save` folder next to the project, named
 //! `<project name>-YYYY-MM-DD_HH-MM-SS-<unix seconds>.fcproj` (local wall-clock time, then the real
-//! time that orders the files). After each write the oldest files of that project beyond the "Maximum
-//! Project Versions" limit are deleted. Only files whose name is exactly `<name>-<timestamp>.fcproj`
-//! or `<name>-<timestamp>-<unix seconds>.fcproj` are ever touched.
+//! time that orders the files). If multiple saves have the same timestamp, `-collision-N` is appended.
+//! After each write the oldest files of that project beyond the "Maximum Project Versions" limit are
+//! deleted. Only files whose name is exactly `<name>-<timestamp>.fcproj`,
+//! `<name>-<timestamp>-<unix seconds>.fcproj` or `<name>-<timestamp>-<unix seconds>-collision-N.fcproj`
+//! are ever touched.
 
 use std::fs;
 use std::io;
@@ -86,16 +88,29 @@ fn is_stamp(s: &str) -> bool {
         })
 }
 
-/// Parse `YYYY-MM-DD_HH-MM-SS` or `YYYY-MM-DD_HH-MM-SS-<unix>` into the stamp and the unix time
-/// (`None` for files written before the unix time was part of the name).
-fn parse_stamp(s: &str) -> Option<(&str, Option<i64>)> {
+/// Parse an auto-save name into its wall-clock stamp, unix time and collision number.
+fn parse_stamp(s: &str) -> Option<(&str, Option<i64>, Option<u64>)> {
     if is_stamp(s) {
-        return Some((s, None));
+        return Some((s, None, None));
     }
     let stamp = s.get(..19).filter(|st| is_stamp(st))?;
-    let digits = s.get(19..)?.strip_prefix('-')?;
-    let unix: i64 = digits.parse().ok()?;
-    (unix.to_string() == digits).then_some((stamp, Some(unix)))
+    let rest = s.get(19..)?.strip_prefix('-')?;
+    let (unix_digits, collision) = match rest.split_once("-collision-") {
+        Some((unix, collision)) => (unix, Some(collision)),
+        None => (rest, None),
+    };
+    let unix: i64 = unix_digits.parse().ok()?;
+    if unix.to_string() != unix_digits {
+        return None;
+    }
+    let collision = match collision {
+        Some(digits) => {
+            let n: u64 = digits.parse().ok()?;
+            (n.to_string() == digits).then_some(n)
+        }
+        None => None,
+    };
+    Some((stamp, Some(unix), collision))
 }
 
 /// Auto-saves of project `name` in `dir`, oldest first (by real time, not by the local clock; files
@@ -103,16 +118,16 @@ fn parse_stamp(s: &str) -> Option<(&str, Option<i64>)> {
 pub fn list_auto_saves(dir: &Path, name: &str) -> Vec<PathBuf> {
     let prefix = format!("{}-", file_stem(name));
     let Ok(rd) = fs::read_dir(dir) else { return Vec::new() };
-    let mut v: Vec<(Option<i64>, String, PathBuf)> = rd
+    let mut v: Vec<(Option<i64>, String, Option<u64>, PathBuf)> = rd
         .filter_map(|e| e.ok())
         .filter_map(|e| {
             let f = e.file_name().to_string_lossy().into_owned();
-            let (stamp, unix) = parse_stamp(f.strip_prefix(&prefix)?.strip_suffix(".fcproj")?)?;
-            Some((unix, stamp.to_string(), e.path()))
+            let (stamp, unix, collision) = parse_stamp(f.strip_prefix(&prefix)?.strip_suffix(".fcproj")?)?;
+            Some((unix, stamp.to_string(), collision, e.path()))
         })
         .collect();
     v.sort();
-    v.into_iter().map(|(_, _, p)| p).collect()
+    v.into_iter().map(|(_, _, _, p)| p).collect()
 }
 
 /// Delete the oldest auto-saves of `name` so at most `max` remain. Returns the deleted paths.
@@ -130,8 +145,20 @@ pub fn rotate(dir: &Path, name: &str, max: usize) -> io::Result<Vec<PathBuf>> {
 /// Write one auto-save (atomically) into `dir` and rotate. Returns the new file.
 pub fn write_auto_save(dir: &Path, name: &str, unix: i64, offset_secs: i32, data: &[u8], max: usize) -> io::Result<PathBuf> {
     fs::create_dir_all(dir)?;
-    let path = dir.join(auto_save_name(name, unix, offset_secs));
-    crate::atomic_write(&path, data)?;
+    let base = auto_save_name(name, unix, offset_secs);
+    let mut path = dir.join(&base);
+    let mut collision = 1_u64;
+    loop {
+        match crate::atomic_write_new(&path, data) {
+            Ok(()) => break,
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                let next = collision.checked_add(1).ok_or_else(|| io::Error::other("auto-save name exhausted"))?;
+                path = dir.join(format!("{}-collision-{collision}.fcproj", base.trim_end_matches(".fcproj")));
+                collision = next;
+            }
+            Err(e) => return Err(e),
+        }
+    }
     rotate(dir, name, max)?;
     Ok(path)
 }
@@ -202,6 +229,19 @@ mod tests {
         assert_eq!(fs::read(&a).unwrap(), b"first");
         assert_eq!(fs::read(&b).unwrap(), b"second");
         assert_eq!(list_auto_saves(&d, "Cut"), vec![a, b]);
+        fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn same_second_preserves_both_saves() {
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let d = std::env::temp_dir().join(format!("filmcraft-same-second-{}-{nonce}", std::process::id()));
+        let timestamp = 1_790_000_000;
+        let first = write_auto_save(&d, "Cut", timestamp, 0, b"first", 5).unwrap();
+        let second = write_auto_save(&d, "Cut", timestamp, 0, b"second", 5).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(fs::read(&first).unwrap(), b"first");
+        assert_eq!(fs::read(&second).unwrap(), b"second");
         fs::remove_dir_all(&d).unwrap();
     }
 
